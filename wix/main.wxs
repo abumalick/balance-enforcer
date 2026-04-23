@@ -21,7 +21,7 @@
   across upgrades.
 
   Variables `$(var.Version)` and `$(var.CargoTargetBinDir)` are injected by
-  cargo-wix at build time (see `cargo wix --help`).
+  cargo-wix at build time.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
@@ -101,7 +101,7 @@
     <!--
       Finish-dialog "Pick audio device now" checkbox. The .exe is
       windows_subsystem="windows" so the picker needs a console; src/install.rs
-      calls AttachConsole/AllocConsole when --install is detected.
+      calls AttachConsole/AllocConsole when the install subcommand runs.
     -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
