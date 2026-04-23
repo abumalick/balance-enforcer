@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WiX 3 source for the per-user MSI of balance-enforcer.
+
+  Per-user single-package authoring (MSI 4.5+, Win10/11 baseline) — no UAC.
+  Install dir: %LOCALAPPDATA%\Programs\BalanceEnforcer (matches VS Code /
+  Squirrel convention; Program Files would require admin).
+
+  The autostart HKCU Run key is declared as a `RegistryValue` KeyPath on the
+  .exe component, so the installer handles its lifecycle transactionally — no
+  custom action is needed. The .exe itself detects when it lives in the
+  managed install dir (via `is_managed_install` in src/install.rs) and skips
+  the autostart write that the standalone CLI install path would normally do.
+
+  Per-user components MUST use a registry KeyPath (not file KeyPath); both
+  components below follow that rule.
+
+  GUIDs: UpgradeCode is stable forever (mirrored in Cargo.toml under
+  [package.metadata.wix].upgrade-guid). ProductCode is regenerated each build
+  via Id="*". Component GUIDs are also stable so MSI's reference counting works
+  across upgrades.
+
+  Variables `$(var.Version)` and `$(var.CargoTargetBinDir)` are injected by
+  cargo-wix at build time (see `cargo wix --help`).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="Balance Enforcer"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="abumalick"
+           UpgradeCode="682A6465-3778-44CA-9FCB-469FC2A5BAD8">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perUser"
+             InstallPrivileges="limited"
+             Description="Pins mono-right audio balance on a chosen Windows output device." />
+
+    <!-- Modern single-package per-user authoring (MSI 4.5+). -->
+    <Property Id="ALLUSERS" Value="2" />
+    <Property Id="MSIINSTALLPERUSER" Value="1" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <MajorUpgrade
+      Schedule="afterInstallInitialize"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLDIR" Name="BalanceEnforcer" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="StartMenuFolder" Name="Balance Enforcer" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="BalanceEnforcerExeComponent"
+                 Guid="10DA8A3F-3557-4DD3-ABF8-1E5630990702">
+        <File Id="balance_enforcer.exe"
+              Source="$(var.CargoTargetBinDir)\balance-enforcer.exe"
+              KeyPath="no" />
+        <RegistryKey Root="HKCU"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Run">
+          <RegistryValue Name="BalanceEnforcer"
+                         Type="string"
+                         Value="&quot;[#balance_enforcer.exe]&quot;"
+                         KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="StartMenuFolder">
+      <Component Id="StartMenuShortcutComponent"
+                 Guid="525CA52B-741E-4725-94BF-9269F836B58A">
+        <Shortcut Id="ConfigureShortcut"
+                  Name="Configure Balance Enforcer"
+                  Description="Pick the target audio device for Balance Enforcer"
+                  Target="[#balance_enforcer.exe]"
+                  Arguments="--install"
+                  WorkingDirectory="INSTALLDIR" />
+        <RemoveFolder Id="RemoveStartMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\BalanceEnforcer\StartMenu"
+                       Name="Installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="Main" Title="Balance Enforcer" Level="1">
+      <ComponentRef Id="BalanceEnforcerExeComponent" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+    </Feature>
+
+    <!--
+      Finish-dialog "Pick audio device now" checkbox. The .exe is
+      windows_subsystem="windows" so the picker needs a console; src/install.rs
+      calls AttachConsole/AllocConsole when --install is detected.
+    -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
+              Value="Pick audio device now (opens a console picker)" />
+
+    <CustomAction Id="LaunchPicker"
+                  FileKey="balance_enforcer.exe"
+                  ExeCommand="--install"
+                  Execute="immediate"
+                  Impersonate="yes"
+                  Return="asyncNoWait" />
+
+    <UI>
+      <UIRef Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog"
+               Control="Finish"
+               Event="DoAction"
+               Value="LaunchPicker">
+        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed
+      </Publish>
+    </UI>
+  </Product>
+</Wix>

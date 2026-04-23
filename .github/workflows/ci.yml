@@ -45,6 +45,24 @@ jobs:
           path: target/release/balance-enforcer.exe
           if-no-files-found: error
 
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --locked
+
+      - name: Build MSI
+        # WiX 3 toolset ships preinstalled on windows-latest runners (see
+        # actions/runner-images). cargo-wix reads `[package.metadata.wix]`
+        # from Cargo.toml and consumes the wix/main.wxs we commit.
+        # --no-build: reuse the artifacts from the prior `cargo build --release`.
+        # --nocapture: stream candle/light output for easier debugging.
+        run: cargo wix --no-build --nocapture
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: balance-enforcer-msi
+          path: target/wix/balance-enforcer-*.msi
+          if-no-files-found: error
+
   macos-xwin:
     name: Cross-compile from macOS (smoke)
     runs-on: macos-latest

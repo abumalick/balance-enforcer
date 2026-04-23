@@ -14,25 +14,37 @@ Nothing else is touched — plug in headphones and Windows routes audio through 
 
 ## Install on Windows
 
-Download `balance-enforcer.exe` from the latest GitHub Actions run, or build it yourself (see below). Then, in PowerShell or `cmd.exe`:
+Download `balance-enforcer-<version>-x86_64.msi` from the latest GitHub Actions run (`balance-enforcer-msi` artifact) and double-click it.
 
-```
-balance-enforcer.exe --install
-```
+The installer is **per-user** — no admin/UAC prompt. It places the executable under `%LOCALAPPDATA%\Programs\BalanceEnforcer\`, registers the autostart entry, and adds a "Balance Enforcer" Start Menu folder. On the final dialog, leave the **"Pick audio device now"** checkbox ticked and click Finish; a console window opens, lists your output devices, and asks you to pick the one with the broken speaker.
 
-This prints a numbered list of output devices and asks you to pick the one with the broken speaker. Use `--install --auto` if you want to skip the prompt and have the current default captured silently.
+If you want to re-pick the target device later, run the **Configure Balance Enforcer** Start Menu shortcut (or `balance-enforcer.exe --install` directly).
 
 ### First-launch SmartScreen prompt
 
-Because the exe isn't code-signed, Windows SmartScreen shows a "Windows protected your PC" dialog the first time you run it from Explorer. Click **More info → Run anyway**. SmartScreen does **not** re-prompt on subsequent logon autostarts.
+Because the MSI and exe aren't code-signed, Windows SmartScreen shows a "Windows protected your PC" dialog the first time. Click **More info → Run anyway**. SmartScreen does **not** re-prompt on subsequent logon autostarts.
 
 ### Uninstall / retarget / status
 
+Uninstall via **Settings → Apps → Installed apps → Balance Enforcer → Uninstall** (or the classic Add/Remove Programs control panel). The autostart entry is removed automatically; `%APPDATA%\balance-enforcer\config.toml` and the logs directory are preserved.
+
+For retargeting and inspection without going through the installer:
+
 ```
-balance-enforcer.exe --uninstall     # remove autostart entry (config preserved)
 balance-enforcer.exe --retarget      # re-pick the target device
 balance-enforcer.exe --status        # show config + autostart state
 ```
+
+### Advanced: install without the MSI
+
+If you'd rather not use the installer, download the bare `balance-enforcer.exe` artifact from CI, drop it somewhere persistent (e.g. `%LOCALAPPDATA%\Programs\BalanceEnforcer-portable\`), and run:
+
+```
+balance-enforcer.exe --install       # picks device + writes the HKCU Run key
+balance-enforcer.exe --uninstall     # removes the Run key (config preserved)
+```
+
+When the .exe is run from outside the MSI install dir it manages its own autostart Run-key entry; when run from inside it, it skips that step and defers to the MSI's declarative `RegistryValue`.
 
 ### Logs
 
@@ -70,9 +82,10 @@ On macOS / Linux the Windows adapter compiles to a stub that returns `AudioError
 - `src/audio.rs` — `AudioController` trait, `AudioError`, `AudioEvent`, `BalancePolicy`. No OS types leak through.
 - `src/enforcer.rs` — pure reconciliation loop. Debounces bursts of volume-change events, enforces `tolerance` to avoid write-loop storms.
 - `src/windows_impl.rs` — `#[cfg(windows)]` adapter backed by `IMMDeviceEnumerator`, `IAudioEndpointVolume`, `IAudioEndpointVolumeCallback`, `IMMNotificationClient`. COM callbacks forward events via a `crossbeam_channel` rather than writing back synchronously.
-- `src/install.rs` — `winreg`-backed HKCU Run registration + interactive device picker.
+- `src/install.rs` — `winreg`-backed HKCU Run registration + interactive device picker + console attach/alloc shim for headless launches (MSI Finish dialog).
 - `src/config.rs` — TOML roundtrip for the pinned target device ID.
 - `src/logging.rs` — `tracing-appender` daily rotation + panic hook that routes panics into the log before the default abort.
+- `wix/main.wxs` — WiX 3 source for the per-user MSI (built by `cargo wix` on `windows-latest` in CI).
 
 ## Non-goals
 

@@ -80,8 +80,13 @@ pub fn install_interactive(exe_path: &Path, auto: bool) -> InstallResult<()> {
     config.save()?;
     println!("Saved target: {}", chosen.friendly_name);
 
-    install_autostart(exe_path)?;
-    println!("Installed autostart entry; balance-enforcer will run at next logon.");
+    if is_managed_install() {
+        println!("Detected MSI-managed install; the autostart entry is owned by the installer.");
+        println!("Sign out and back in (or reboot) to start the daemon.");
+    } else {
+        install_autostart(exe_path)?;
+        println!("Installed autostart entry; balance-enforcer will run at next logon.");
+    }
     Ok(())
 }
 
@@ -213,4 +218,65 @@ pub fn autostart_path() -> InstallResult<Option<String>> {
 /// Convenience: resolve the path of the currently running executable.
 pub fn current_exe() -> io::Result<PathBuf> {
     std::env::current_exe()
+}
+
+/// True when the running executable lives under the canonical MSI install dir
+/// (`%LOCALAPPDATA%\Programs\BalanceEnforcer\`). The MSI declares the autostart
+/// `Run` key as a `RegistryValue` KeyPath, so the daemon must not also write it
+/// from `--install` — otherwise uninstall semantics get confused. On non-Windows
+/// hosts this always returns false.
+pub fn is_managed_install() -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let Some(local_appdata) = dirs::data_local_dir() else {
+        return false;
+    };
+    exe.starts_with(local_appdata.join("Programs").join("BalanceEnforcer"))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsoleMode {
+    /// We attached to the parent process's existing console (e.g. PowerShell).
+    Attached,
+    /// We allocated a fresh console window (e.g. launched from MSI Finish dialog).
+    Allocated,
+    /// No console action taken (non-Windows, or already had a console).
+    None,
+}
+
+impl ConsoleMode {
+    /// When we allocated a fresh console, the window closes the instant our
+    /// process exits and the user never sees the output. Block on a stdin read
+    /// to keep it open until they press Enter.
+    pub fn pause_if_allocated(self) {
+        if self == ConsoleMode::Allocated {
+            print!("\nPress Enter to close this window... ");
+            let _ = io::stdout().flush();
+            let mut buf = String::new();
+            let _ = io::stdin().lock().read_line(&mut buf);
+        }
+    }
+}
+
+/// Attach to the parent process's console, or allocate a fresh one if none is
+/// available. Required because release builds use `windows_subsystem = "windows"`
+/// (so the `--install`-from-MSI-Finish path has no console for the picker).
+#[cfg(windows)]
+pub fn ensure_console() -> ConsoleMode {
+    use windows::Win32::System::Console::{AllocConsole, AttachConsole, ATTACH_PARENT_PROCESS};
+    unsafe {
+        if AttachConsole(ATTACH_PARENT_PROCESS).is_ok() {
+            ConsoleMode::Attached
+        } else if AllocConsole().is_ok() {
+            ConsoleMode::Allocated
+        } else {
+            ConsoleMode::None
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn ensure_console() -> ConsoleMode {
+    ConsoleMode::None
 }
