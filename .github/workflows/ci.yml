@@ -16,7 +16,7 @@ jobs:
     name: Build & test (windows-latest)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -39,7 +39,7 @@ jobs:
         run: cargo build --release
 
       - name: Upload exe artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: balance-enforcer-windows-x64
           path: target/release/balance-enforcer.exe
@@ -49,7 +49,7 @@ jobs:
     name: Cross-compile from macOS (smoke)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -72,7 +72,7 @@ jobs:
         run: cargo xwin build --release --target x86_64-pc-windows-msvc
 
       - name: Upload exe artifact (xwin)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: balance-enforcer-xwin-x64
           path: target/x86_64-pc-windows-msvc/release/balance-enforcer.exe
