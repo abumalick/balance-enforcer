@@ -1,0 +1,38 @@
+[package]
+name = "balance-enforcer"
+version = "0.1.0"
+edition = "2021"
+description = "Windows autostart daemon that pins mono-right audio balance on a single pinned output device"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+crossbeam-channel = "0.5"
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "implement",
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_UI_Shell_PropertiesSystem",
+] }
+windows-core = "0.58"
+winreg = "0.52"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

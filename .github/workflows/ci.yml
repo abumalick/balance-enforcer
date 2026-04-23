@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  windows:
+    name: Build & test (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --release
+
+      - name: cargo build --release
+        run: cargo build --release
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-enforcer-windows-x64
+          path: target/release/balance-enforcer.exe
+          if-no-files-found: error
+
+  macos-xwin:
+    name: Cross-compile from macOS (smoke)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install LLVM (clang for cargo-xwin)
+        run: brew install llvm
+
+      - name: Install cargo-xwin
+        run: cargo install cargo-xwin --locked
+
+      - name: cargo test (portable logic)
+        run: cargo test
+
+      - name: cargo xwin build --release
+        run: cargo xwin build --release --target x86_64-pc-windows-msvc
+
+      - name: Upload exe artifact (xwin)
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-enforcer-xwin-x64
+          path: target/x86_64-pc-windows-msvc/release/balance-enforcer.exe
+          if-no-files-found: error
