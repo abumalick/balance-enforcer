@@ -48,5 +48,6 @@ path-guid     = "BF298783-4C6D-4DD9-B89B-7EB3702ECAB5"
 license       = false
 eula          = false
 # WixUIExtension supplies the `WixUI_Minimal` dialog set used in wix/main.wxs.
+# Only set on compiler-args; cargo-wix auto-appends it to the linker (light)
+# command line, so duplicating it there triggers LGHT0091 duplicate symbols.
 compiler-args = ["-ext", "WixUIExtension"]
-linker-args   = ["-ext", "WixUIExtension"]
