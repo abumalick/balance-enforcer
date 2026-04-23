@@ -51,3 +51,10 @@ eula          = false
 # Only set on compiler-args; cargo-wix auto-appends it to the linker (light)
 # command line, so duplicating it there triggers LGHT0091 duplicate symbols.
 compiler-args = ["-ext", "WixUIExtension"]
+# Suppress two ICE warnings that are false positives for this design:
+#   ICE69 — Start Menu shortcut targets the .exe in a different component;
+#           harmless because both components are in the same Feature and are
+#           always installed/uninstalled together.
+#   ICE91 — File installed to per-user INSTALLDIR doesn't vary by ALLUSERS;
+#           expected, the whole MSI is per-user single-package authoring.
+linker-args   = ["-sice:ICE69", "-sice:ICE91"]

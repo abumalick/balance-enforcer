@@ -71,6 +71,14 @@
                          Value="&quot;[#balance_enforcer.exe]&quot;"
                          KeyPath="yes" />
         </RegistryKey>
+        <!-- Per-user MSI requires explicit RemoveFolder for every directory
+             we create under the user profile (silences ICE64). -->
+        <RemoveFolder Id="RemoveInstallDir"
+                      Directory="INSTALLDIR"
+                      On="uninstall" />
+        <RemoveFolder Id="RemoveProgramsFolder"
+                      Directory="ProgramsFolder"
+                      On="uninstall" />
       </Component>
     </DirectoryRef>
 
