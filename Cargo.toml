@@ -27,6 +27,7 @@ windows = { version = "0.58", features = [
     "Win32_Media_Audio_Endpoints",
     "Win32_Devices_FunctionDiscovery",
     "Win32_UI_Shell_PropertiesSystem",
+    "Win32_System_Console",
 ] }
 windows-core = "0.58"
 winreg = "0.52"
@@ -36,3 +37,24 @@ lto = "thin"
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# cargo-wix metadata. The two GUIDs MUST stay stable across versions — changing
+# upgrade-guid breaks MSI upgrade detection (a new MSI installs alongside the old
+# instead of replacing it). They are public-by-design (visible inside every
+# installed MSI) and intentionally checked in.
+[package.metadata.wix]
+upgrade-guid  = "682A6465-3778-44CA-9FCB-469FC2A5BAD8"
+path-guid     = "BF298783-4C6D-4DD9-B89B-7EB3702ECAB5"
+license       = false
+eula          = false
+# WixUIExtension supplies the `WixUI_Minimal` dialog set used in wix/main.wxs.
+# Only set on compiler-args; cargo-wix auto-appends it to the linker (light)
+# command line, so duplicating it there triggers LGHT0091 duplicate symbols.
+compiler-args = ["-ext", "WixUIExtension"]
+# Suppress two ICE warnings that are false positives for this design:
+#   ICE69 — Start Menu shortcut targets the .exe in a different component;
+#           harmless because both components are in the same Feature and are
+#           always installed/uninstalled together.
+#   ICE91 — File installed to per-user INSTALLDIR doesn't vary by ALLUSERS;
+#           expected, the whole MSI is per-user single-package authoring.
+linker-args   = ["-sice:ICE69", "-sice:ICE91"]

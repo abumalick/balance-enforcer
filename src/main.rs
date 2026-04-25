@@ -51,17 +51,32 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     // Install/uninstall/status paths need console output; run before tracing setup.
+    // Release builds use `windows_subsystem = "windows"` and have no console of
+    // their own, so attach to the parent (PowerShell/cmd) or allocate a fresh
+    // window (MSI Finish-dialog launch).
     if cli.install {
-        return run_install(cli.auto);
+        let console = install::ensure_console();
+        let code = run_install(cli.auto);
+        console.pause_if_allocated();
+        return code;
     }
     if cli.uninstall {
-        return run_uninstall();
+        let console = install::ensure_console();
+        let code = run_uninstall();
+        console.pause_if_allocated();
+        return code;
     }
     if cli.retarget {
-        return run_retarget(cli.auto);
+        let console = install::ensure_console();
+        let code = run_retarget(cli.auto);
+        console.pause_if_allocated();
+        return code;
     }
     if cli.status {
-        return run_status();
+        let console = install::ensure_console();
+        let code = run_status();
+        console.pause_if_allocated();
+        return code;
     }
 
     run_daemon()
@@ -85,6 +100,13 @@ fn run_install(auto: bool) -> ExitCode {
 }
 
 fn run_uninstall() -> ExitCode {
+    if install::is_managed_install() {
+        println!(
+            "This is an MSI-managed install. Use 'Apps & features' (or 'Add or remove \
+             programs') in Windows Settings to uninstall."
+        );
+        return ExitCode::SUCCESS;
+    }
     match install::uninstall_autostart() {
         Ok(()) => {
             println!("Uninstalled autostart entry (config preserved).");
